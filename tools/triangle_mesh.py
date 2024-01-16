@@ -108,7 +108,7 @@ class MeshIO():
         """
         @description: 从mat文件中读取mesh每个面片的面积
         @param: filename -- mat文件名
-        @Returns: mesh每个面片的面积组成的ndarray向量(1*N), N为面片数
+        @Returns: mesh每个面片的面积组成的ndarray向量(N*1), N为面片数
         """
         areas = None
         if os.path.exists(filename):
