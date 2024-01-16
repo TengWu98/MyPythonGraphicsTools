@@ -103,6 +103,51 @@ class MeshIO():
     def write_mesh_with_face_colors(mesh:TriangleMesh, face_labels, filename):
         pass
 
+    @staticmethod
+    def load_face_areas_from_mat(filename:str):
+        """
+        @description: 从mat文件中读取mesh每个面片的面积
+        @param: filename -- mat文件名
+        @Returns: mesh每个面片的面积组成的ndarray向量(1*N), N为面片数
+        """
+        areas = None
+        if os.path.exists(filename):
+            areas = io.loadmat(filename)['areas']
+        return areas
+    
+    @staticmethod
+    def load_face_features_from_mat(filename:str):
+        """
+        @description: 从mat文件中读取mesh每个面片的特征
+        @param: filename -- mat文件名
+        @Returns: mesh每个面片的特征组成的ndarray向量(N*F), N为面片数, F为特征维度
+        """
+        feature = None
+        if os.path.exists(filename):
+            feature = io.loadmat(filename)['feature']
+        return feature
+    
+    @staticmethod
+    def load_face_segs_from_mat(filename:str):
+        """
+        @description: 从mat文件中读取mesh的分割标签
+        @param: filename -- mat文件名
+        @Returns: mesh的分割标签组成的ndarray向量(N*1), N为面片数
+        """
+        seg = None
+        if os.path.exists(filename):
+            seg = io.loadmat(filename)['seg']
+        return seg
+    
+    @staticmethod
+    def save_face_segs_to_mat(filename:str, seg:np.ndarray):
+        """
+        @description: 将分割结果保存到mat文件中
+        @param: filename -- mat文件名, seg -- 分割结果(1*N), N为面片数
+        @Returns: None
+        """
+        io.savemat(filename, {'seg':seg})
+
 class MeshPlot:
     @staticmethod
     def plot_mesh_with_face_values(mesh:TriangleMesh, face_values=None):
@@ -175,44 +220,8 @@ class MeshProcessing:
     @staticmethod
     def compute_vertex_areas(mesh:TriangleMesh):
         pass
-    
-    @staticmethod
-    def load_face_areas_from_mat(filename:str):
-        """
-        @description: 从mat文件中读取mesh每个面片的面积
-        @param: filename -- mat文件名
-        @Returns: mesh每个面片的面积组成的ndarray向量(1*N), N为面片数
-        """
-        areas = None
-        if os.path.exists(filename):
-            areas = io.loadmat(filename)['areas']
-        return areas
-    
-    @staticmethod
-    def load_face_feature_from_mat(filename:str):
-        """
-        @description: 从mat文件中读取mesh每个面片的特征
-        @param: filename -- mat文件名
-        @Returns: mesh每个面片的特征组成的ndarray向量(N*F), N为面片数, F为特征维度
-        """
-        feature = None
-        if os.path.exists(filename):
-            feature = io.loadmat(filename)['feature']
-        return feature
 
 class MeshSegmentation:
-    @staticmethod
-    def load_seg_file_from_mat(filename:str):
-        """
-        @description: 从mat文件中读取mesh的分割标签
-        @param: filename -- mat文件名
-        @Returns: mesh的分割标签组成的ndarray向量(N*1), N为面片数
-        """
-        seg = None
-        if os.path.exists(filename):
-            seg = io.loadmat(filename)['seg']
-        return seg
-
     @staticmethod
     def compute_segmentation_accuracy(pred_label:np.ndarray, gt:np.ndarray, areas:np.ndarray):
         """
@@ -226,15 +235,6 @@ class MeshSegmentation:
     @staticmethod
     def compute_segmentation_iou(pred, gt):
         pass
-
-    @staticmethod
-    def save_seg_file_to_mat(filename:str, seg:np.ndarray):
-        """
-        @description: 将分割结果保存到mat文件中
-        @param: filename -- mat文件名, seg -- 分割结果(1*N), N为面片数
-        @Returns: None
-        """
-        io.savemat(filename, {'seg':seg})
 
     @staticmethod
     def get_dataset_info(dataset_name:str):
