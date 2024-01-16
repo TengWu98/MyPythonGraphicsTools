@@ -113,7 +113,7 @@ class MeshIO():
         areas = None
         if os.path.exists(filename):
             areas = io.loadmat(filename)['areas']
-        return areas
+        return np.transpose(areas)
     
     @staticmethod
     def load_face_features_from_mat(filename:str):
