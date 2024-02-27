@@ -29,7 +29,6 @@ def r2h(x):
     """
     return colors.rgb2hex(tuple(map(lambda y: y / 255., x)))
 
-
 def get_uuid():
     """
     @description: Generate a random UUID (Universally Unique Identifier) in hexadecimal format.
