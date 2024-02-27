@@ -145,3 +145,33 @@ def get_dataset_info(dataset_name:str):
         raise ValueError("Unknown dataset name.")
 
     return dataset_info
+
+if __name__ == '__main__':
+    # test load_face_areas_from_mat
+    areas = load_face_areas_from_mat('./data/Airplane_1_Areas.mat')
+    print(areas.shape)
+    print(type(areas))
+
+    # test load_face_areas_from_mat
+    feature = load_face_features_from_mat('./data/Airplane_1_747.mat')
+    print(feature.shape)
+    print(type(feature))
+
+    # test load_face_segs_from_mat
+    seg = load_face_segs_from_mat('./data/Airplane_1_Seg.mat')
+    print(seg.shape)
+    print(type(seg))
+
+    labels = np.ones(seg.shape) + 1
+    print(labels.shape)
+
+    # test save_face_segs_to_mat
+    accuracy = compute_seg_accuracy(np.transpose(labels), np.transpose(seg), areas)
+    print(accuracy)
+
+    # test save_face_segs_to_mat
+    save_face_segs_to_mat('./data/Airplane_1_Seg_My.mat', labels)
+
+    # test get_dataset_info
+    psb = get_dataset_info('psb')
+    print(psb)
