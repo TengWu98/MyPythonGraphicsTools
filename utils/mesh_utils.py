@@ -8,6 +8,7 @@ from scipy import io
 from scipy.spatial.transform import Rotation
 
 import trimesh
+import triangle as tr
 
 MESH_EXTENSIONS = [
     '.obj',
@@ -79,9 +80,54 @@ def load_mesh(path:str, normalize=False, augments=[]):
     return mesh
 
 # # ================================================= #
+# # ******** geometry utils ******** #
+# # ================================================= #
+def face_areas(verts, faces):
+    """
+    @description: Calculate the areas of faces in a mesh.
+    @param verts: The vertices of the mesh.
+    @param faces: The faces of the mesh.
+    @Returns: A numpy array containing the area of each face.
+    """
+    areas = []
+    for face in faces:
+        t = np.cross(verts[face[1]] - verts[face[0]], 
+                     verts[face[2]] - verts[face[0]])
+        areas.append(np.linalg.norm(t) / 2)
+    return np.array(areas)
+
+def vector_angle(A, B):
+    """
+    @description: Calculate the angle between two vectors.
+    @param A: The first vector.
+    @param B: The second vector.
+    @Returns: The angle between vectors A and B in radians.
+    """
+    return np.arccos(np.dot(A, B) / np.linalg.norm(A) / np.linalg.norm(B))
+
+def triangle_angles(triangle):
+    """
+    @description: Calculate the angles of a triangle.
+    @param triangle: The vertices of the triangle.
+    @Returns: A numpy array containing the angles of the triangle in radians.
+    """  
+    a = vector_angle(triangle[1] - triangle[0], triangle[2] - triangle[0])
+    b = vector_angle(triangle[2] - triangle[1], triangle[0] - triangle[1])
+    c = np.pi - a - b
+    return np.array([a, b, c])
+
+def min_triangle_angles(triangle):
+    """
+    @description: Calculate the minimum angle of a triangle.
+    @param triangle: The vertices of the triangle.
+    @Returns: The minimum angle of the triangle in radians.
+    """
+    return triangle_angles(triangle).min()
+
+# # ================================================= #
 # # ******** face features ******** #
 # # ================================================= #
-def extract_13_dim_face_features(mesh: trimesh.Trimesh, request=[]):
+def face_features_from_hu(mesh: trimesh.Trimesh, request=[]):
     """
     @description: Extract 13-dimensional features for each face of the mesh. From https://github.com/lzhengning/SubdivNet.
     @param mesh: The mesh from which to extract features.
@@ -248,6 +294,7 @@ def get_dataset_info(dataset_name:str):
 if __name__ == '__main__':
     # test load_face_areas_from_mat
     areas = load_face_areas_from_mat('./data/Airplane_1_Areas.mat')
+    print(areas)
     print(type(areas))
 
     # test load_face_areas_from_mat
@@ -277,7 +324,12 @@ if __name__ == '__main__':
 
     mesh = load_mesh('./data/Airplane_1.off', normalize=True, augments=['orient', 'scale'])
 
-    # test extract_13_dim_face_features
-    features = extract_13_dim_face_features(mesh, request=['area', 'normal', 'center', 'face_angles', 'curvs'])
+    # test face_areas
+    areas = face_areas(mesh.vertices, mesh.faces)
+    print(areas)
+    print(areas.shape)
+
+    # test face_features
+    features = face_features_from_hu(mesh, request=['area', 'normal', 'center', 'face_angles', 'curvs'])
     print(features)
     print(features.shape)
