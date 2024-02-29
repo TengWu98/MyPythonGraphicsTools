@@ -1,8 +1,13 @@
 import os
 import sys
 
-from scipy import io
 import numpy as np
+
+import random
+from scipy import io
+from scipy.spatial.transform import Rotation
+
+import trimesh
 
 MESH_EXTENSIONS = [
     '.obj',
@@ -18,49 +23,143 @@ def is_mesh_file(filename:str):
     return any(filename.endswith(extension) for extension in MESH_EXTENSIONS)
 
 # # ================================================= #
+# # ******** load mesh ******** #
+# # ================================================= #
+def randomize_mesh_orientation(mesh: trimesh.Trimesh):
+    """
+    @description: Randomly rotate the mesh along different axes.
+    @param mesh: The mesh to be rotated.
+    @Returns: The rotated mesh.
+    """
+    axis_seq = ''.join(random.sample('xyz', 3))
+    angles = [random.choice([0, 90, 180, 270]) for _ in range(3)]
+    rotation = Rotation.from_euler(axis_seq, angles, degrees=True)
+    mesh.vertices = rotation.apply(mesh.vertices)
+    return mesh
+
+def random_scale(mesh: trimesh.Trimesh):
+    """
+    @description: Randomly scale the mesh.
+    @param mesh: The mesh to be scaled.
+    @Returns: The scaled mesh.
+    """
+    mesh.vertices = mesh.vertices * np.random.normal(1, 0.1, size=(1, 3))
+    return mesh
+
+def mesh_normalize(mesh: trimesh.Trimesh):
+    """
+    @description: Normalize the mesh vertices to be within [0, 1].
+    @param mesh: The mesh to be normalized.
+    @Returns: The normalized mesh.
+    """
+    vertices = mesh.vertices - mesh.vertices.min(axis=0)
+    vertices = vertices / vertices.max()
+    mesh.vertices = vertices
+    return mesh
+
+def load_mesh(path:str, normalize=False, augments=[]):
+    """
+    @description: Load a mesh from a file and optionally apply normalization and augmentations.
+    @param path: Path to the mesh file.
+    @param normalize: Whether to normalize the mesh vertices.
+    @param augments: List of augmentation methods to apply ('orient' for orientation, 'scale' for scaling).
+    @Returns: The processed mesh.
+    """
+    mesh = trimesh.load_mesh(path, process=False)
+
+    for method in augments:
+        if method == 'orient':
+            mesh = randomize_mesh_orientation(mesh)
+        if method == 'scale':
+            mesh = random_scale(mesh)
+
+    if normalize:
+        mesh = mesh_normalize(mesh)
+
+    return mesh
+
+# # ================================================= #
+# # ******** face features ******** #
+# # ================================================= #
+def extract_13_dim_face_features(mesh: trimesh.Trimesh, request=[]):
+    """
+    @description: Extract 13-dimensional features for each face of the mesh. From https://github.com/lzhengning/SubdivNet.
+    @param mesh: The mesh from which to extract features.
+    @param request: List of feature types to extract ('area', 'normal', 'center', 'face_angles', 'curvs').
+    @Returns: A numpy array of extracted features.
+    """
+    faces = mesh.faces
+    vertices = mesh.vertices
+
+    face_center = vertices[faces.flatten()].reshape(-1, 3, 3).mean(axis=1)
+    vertex_normals = mesh.vertex_normals
+    face_normals = mesh.face_normals
+    face_curvs = np.vstack([
+        (vertex_normals[faces[:, 0]] * face_normals).sum(axis=1),
+        (vertex_normals[faces[:, 1]] * face_normals).sum(axis=1),
+        (vertex_normals[faces[:, 2]] * face_normals).sum(axis=1),
+    ])
+
+    features = []
+    if 'area' in request:
+        features.append(mesh.area_faces)
+    if 'normal' in request:
+        features.append(face_normals.T)
+    if 'center' in request:
+        features.append(face_center.T)
+    if 'face_angles' in request:
+        features.append(np.sort(mesh.face_angles, axis=1).T)
+    if 'curvs' in request:
+        features.append(np.sort(face_curvs, axis=0))
+
+    features = np.vstack(features)
+
+    return features
+
+# # ================================================= #
 # # ******** load from mat/save to mat ******** #
 # # ================================================= #
-def load_face_areas_from_mat(filename:str):
+def load_face_areas_from_mat(path:str):
     """
     @description: Load face areas from a MAT file.
-    @param filename: The name of the MAT file to load from.
+    @param path: The path of the MAT file to load from.
     @Returns: A numpy array containing the face areas.
     """
     areas = None
-    if os.path.exists(filename):
-        areas = io.loadmat(filename)['areas']
+    if os.path.exists(path):
+        areas = io.loadmat(path)['areas']
     return np.transpose(areas)
 
-def load_face_features_from_mat(filename:str):
+def load_face_features_from_mat(path:str):
     """
     @description: Load face features from a MAT file.
-    @param filename: The name of the MAT file to load from.
+    @param path: The path of the MAT file to load from.
     @Returns: A numpy array containing the face features.
     """
     feature = None
-    if os.path.exists(filename):
-        feature = io.loadmat(filename)['feature']
+    if os.path.exists(path):
+        feature = io.loadmat(path)['feature']
     return feature
 
-def load_face_segs_from_mat(filename:str):
+def load_face_segs_from_mat(path:str):
     """
     @description: Load face segs from a MAT file.
-    @param filename: The name of the MAT file to load from.
+    @param path: The path of the MAT file to load from.
     @Returns: A numpy array containing the face segs.
     """
     seg = None
-    if os.path.exists(filename):
-        seg = io.loadmat(filename)['seg']
+    if os.path.exists(path):
+        seg = io.loadmat(path)['seg']
     return seg
 
-def save_face_segs_to_mat(filename:str, seg:np.ndarray):
+def save_face_segs_to_mat(path:str, seg:np.ndarray):
     """
     @description: Save face segmentations to a MAT file.
-    @param filename: The name of the MAT file to save to.
+    @param path: The path of the MAT file to save to.
     @param seg: The numpy array containing the face segs to save.
     @Returns: None
     """
-    io.savemat(filename, {'seg':seg})
+    io.savemat(path, {'seg':seg})
 
 # # ================================================= #
 # # ******** mesh segmentation ******** #
@@ -73,7 +172,7 @@ def compute_seg_accuracy(pred_label:np.ndarray, gt:np.ndarray, areas:np.ndarray)
     @param areas: The area of each face.
     @Returns: The segmentation accuracy as a float.
     """
-    accuracy = np.sum((pred_label == gt) * areas) / np.sum(areas)
+    accuracy = areas[pred_label == gt].sum() / areas.sum()
     return accuracy
 
 # # ================================================= #
@@ -149,7 +248,6 @@ def get_dataset_info(dataset_name:str):
 if __name__ == '__main__':
     # test load_face_areas_from_mat
     areas = load_face_areas_from_mat('./data/Airplane_1_Areas.mat')
-    print(areas.shape)
     print(type(areas))
 
     # test load_face_areas_from_mat
@@ -162,11 +260,12 @@ if __name__ == '__main__':
     print(seg.shape)
     print(type(seg))
 
-    labels = np.ones(seg.shape) + 1
+    labels = np.ones(seg.shape)
+    print(labels)
     print(labels.shape)
 
     # test save_face_segs_to_mat
-    accuracy = compute_seg_accuracy(np.transpose(labels), np.transpose(seg), areas)
+    accuracy = compute_seg_accuracy(labels, seg, areas)
     print(accuracy)
 
     # test save_face_segs_to_mat
@@ -175,3 +274,10 @@ if __name__ == '__main__':
     # test get_dataset_info
     psb = get_dataset_info('psb')
     print(psb)
+
+    mesh = load_mesh('./data/Airplane_1.off', normalize=True, augments=['orient', 'scale'])
+
+    # test extract_13_dim_face_features
+    features = extract_13_dim_face_features(mesh, request=['area', 'normal', 'center', 'face_angles', 'curvs'])
+    print(features)
+    print(features.shape)
